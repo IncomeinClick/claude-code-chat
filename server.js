@@ -34,6 +34,69 @@ app.get("/api/config", (req, res) => {
   res.json({ displayName: DISPLAY_NAME });
 });
 
+// List past Claude sessions for resume picker
+app.get("/api/sessions", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !verifyToken(authHeader.replace("Bearer ", ""))) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const sessionDir = path.join(CLAUDE_CWD, ".claude", "projects", "-root");
+  const sessions = [];
+
+  try {
+    const files = fs.readdirSync(sessionDir).filter(f => f.endsWith(".jsonl") && !f.includes("/"));
+    for (const file of files) {
+      const sid = file.replace(".jsonl", "");
+      const fullPath = path.join(sessionDir, file);
+      let firstUserMsg = null;
+      let timestamp = null;
+
+      try {
+        const content = fs.readFileSync(fullPath, "utf8");
+        for (const line of content.split("\n")) {
+          if (!line.trim()) continue;
+          let obj;
+          try { obj = JSON.parse(line); } catch { continue; }
+
+          if (!timestamp) {
+            const ts = obj.timestamp || (obj.snapshot && obj.snapshot.timestamp);
+            if (ts) timestamp = ts;
+          }
+
+          if (obj.type === "user" && !firstUserMsg) {
+            const msg = obj.message;
+            if (msg && typeof msg === "object") {
+              const content = msg.content;
+              if (typeof content === "string" && content.trim()) {
+                firstUserMsg = content.trim().slice(0, 100);
+              } else if (Array.isArray(content)) {
+                for (const block of content) {
+                  if (block && block.type === "text" && block.text) {
+                    firstUserMsg = block.text.trim().slice(0, 100);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (firstUserMsg && timestamp) break;
+        }
+
+        if (firstUserMsg) {
+          sessions.push({ id: sid, timestamp: timestamp || "unknown", summary: firstUserMsg });
+        }
+      } catch {}
+    }
+
+    sessions.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+    res.json({ sessions: sessions.slice(0, 20) });
+  } catch (e) {
+    res.json({ sessions: [] });
+  }
+});
+
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   if (username !== USERNAME) return res.status(401).json({ error: "Invalid credentials" });
@@ -68,13 +131,14 @@ wss.on("connection", (ws, req) => {
   const user = verifyToken(token);
   if (!user) { ws.close(4001, "Unauthorized"); return; }
 
+  const resumeId = url.searchParams.get("resume") || null;
   const sessionId = crypto.randomUUID();
-  console.log(`[${sessionId}] Connected: ${user.user}`);
+  console.log(`[${sessionId}] Connected: ${user.user}${resumeId ? ` (resume: ${resumeId})` : ""}`);
 
   const session = {
     id: sessionId, ws, claude: null,
     startTime: Date.now(), lastActivity: Date.now(),
-    inactivityTimer: null,
+    inactivityTimer: null, resumeId, stopping: false,
   };
   sessions.set(sessionId, session);
   safeSend(ws, { type: "session_start", sessionId, startTime: session.startTime, timeoutMs: INACTIVITY_TIMEOUT });
@@ -82,13 +146,15 @@ wss.on("connection", (ws, req) => {
   session.claude = null;
 
   function spawnClaude() {
-    const proc = spawn(CLAUDE_BIN, [
+    const args = [
       "-p",
       "--output-format", "stream-json",
       "--input-format", "stream-json",
       "--include-partial-messages",
       "--verbose",
-    ], {
+    ];
+    if (session.resumeId) args.push("--resume", session.resumeId);
+    const proc = spawn(CLAUDE_BIN, args, {
       cwd: CLAUDE_CWD,
       env: cleanEnv(),
       stdio: ["pipe", "pipe", "pipe"],
@@ -118,7 +184,13 @@ wss.on("connection", (ws, req) => {
 
     proc.on("close", (code) => {
       console.log(`[${sessionId}] Claude exited: ${code}`);
-      safeSend(ws, { type: "exit", code });
+      session.claude = null;
+      if (session.stopping) {
+        session.stopping = false;
+        safeSend(ws, { type: "stopped" });
+      } else {
+        safeSend(ws, { type: "exit", code });
+      }
     });
 
     return proc;
@@ -153,6 +225,11 @@ wss.on("connection", (ws, req) => {
         session.claude = spawnClaude();
       }
       sendToClaudeInput(msg.content);
+    } else if (msg.type === "stop") {
+      if (session.claude) {
+        session.stopping = true;
+        session.claude.kill("SIGINT");
+      }
     } else if (msg.type === "end_session") {
       if (session.claude) session.claude.kill();
       safeSend(ws, { type: "exit", code: 0 });
