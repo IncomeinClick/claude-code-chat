@@ -1,0 +1,19 @@
+{
+  "name": "tim-chat",
+  "version": "1.0.0",
+  "description": "Web chat UI for Claude Code CLI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "hash-password": "node -e \"require('bcryptjs').hash(process.argv[1],10).then(console.log)\"",
+    "gen-secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+  },
+  "keywords": ["claude", "chat", "cli", "web-ui"],
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "ws": "^8.19.0"
+  }
+}

@@ -1,0 +1,18 @@
+[Unit]
+Description=Tim Chat - Claude Code Web UI
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node __INSTALL_DIR__/server.js
+WorkingDirectory=__INSTALL_DIR__
+Restart=always
+RestartSec=5
+Environment=HOME=__HOME_DIR__
+Environment=PATH=__HOME_DIR__/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tim-chat
+
+[Install]
+WantedBy=multi-user.target

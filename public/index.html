@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b2b2b">
+<title>Tim Chat</title>
+<style>
+:root {
+  --bg-primary: #2b2b2b;
+  --bg-secondary: #343434;
+  --bg-tertiary: #3d3d3d;
+  --bg-input: #3d3d3d;
+  --text-primary: #ececec;
+  --text-secondary: #a8a8a8;
+  --text-muted: #737373;
+  --accent: #da7756;
+  --accent-hover: #e8956e;
+  --border: #424242;
+  --user-bg: #343434;
+  --assistant-bg: #2b2b2b;
+  --success: #4ade80;
+  --warning: #e3a765;
+  --code-bg: #1e1e1e;
+  --scrollbar: #424242;
+  --scrollbar-hover: #525252;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Login Screen */
+.login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100dvh;
+  padding: 20px;
+}
+
+.login-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.login-box h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: var(--accent);
+}
+
+.login-box p {
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.login-box input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  margin-bottom: 12px;
+  outline: none;
+}
+
+.login-box input:focus { border-color: var(--accent); }
+
+.login-box button {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.login-box button:hover { background: var(--accent-hover); }
+
+.login-error {
+  color: var(--accent);
+  font-size: 13px;
+  margin-top: 8px;
+  display: none;
+}
+
+/* Chat Screen */
+.chat-screen {
+  display: none;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+/* Header */
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-left h2 {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.session-timer {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-btn {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-btn:hover { background: var(--border); color: var(--text-primary); }
+.header-btn.danger { border-color: var(--accent); color: var(--accent); }
+.header-btn.danger:hover { background: var(--accent); color: white; }
+
+/* Messages Area */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  scroll-behavior: smooth;
+}
+
+.messages::-webkit-scrollbar { width: 6px; }
+.messages::-webkit-scrollbar-track { background: transparent; }
+.messages::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+.messages::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+.message {
+  max-width: 800px;
+  margin: 0 auto 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  line-height: 1.6;
+  position: relative;
+}
+
+.message.user {
+  background: var(--user-bg);
+  margin-left: 40px;
+  border-bottom-right-radius: 4px;
+}
+
+.message.assistant {
+  background: var(--assistant-bg);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.message.system {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 8px;
+}
+
+.message-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message:hover .copy-btn { opacity: 1; }
+.copy-btn:hover { color: var(--text-primary); }
+
+/* Thinking indicator */
+.thinking {
+  display: none;
+  max-width: 800px;
+  margin: 0 auto 16px;
+  padding: 12px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.thinking.active { display: flex; align-items: center; gap: 8px; }
+
+.thinking-dots span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: bounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* Tool use indicator */
+.tool-indicator {
+  max-width: 800px;
+  margin: 4px auto;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.tool-indicator .tool-name { color: var(--warning); font-weight: 600; }
+
+/* Input Area */
+.input-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.input-wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.input-box {
+  flex: 1;
+  position: relative;
+}
+
+#message-input {
+  width: 100%;
+  min-height: 44px;
+  max-height: 200px;
+  padding: 10px 16px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+}
+
+#message-input:focus { border-color: var(--accent); }
+#message-input::placeholder { color: var(--text-muted); }
+
+.input-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.input-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.input-btn:hover { background: var(--border); color: var(--text-primary); }
+.input-btn.send { background: var(--accent); color: white; border-color: var(--accent); }
+.input-btn.send:hover { background: var(--accent-hover); }
+
+/* File upload */
+.file-drop-zone {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(218, 119, 86, 0.1);
+  border: 3px dashed var(--accent);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.file-drop-zone.active { display: flex; }
+
+.file-preview {
+  display: none;
+  gap: 8px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+.file-preview.has-files { display: flex; }
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.file-chip .remove {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* Markdown rendering */
+.message-content code {
+  background: var(--code-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.message-content pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message-content p { margin: 4px 0; }
+.message-content ul, .message-content ol { margin: 4px 0; padding-left: 24px; }
+.message-content h1, .message-content h2, .message-content h3 { margin: 12px 0 6px; }
+.message-content a { color: var(--accent); }
+.message-content blockquote {
+  border-left: 3px solid var(--accent);
+  padding-left: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .message { padding: 12px 14px; }
+  .message.user { margin-left: 20px; }
+  .chat-header { padding: 10px 14px; }
+  .messages { padding: 14px; }
+  .input-area { padding: 8px 14px 12px; }
+}
+
+#file-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <h1>Tim Chat</h1>
+    <p>Claude Code Web UI</p>
+    <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+    <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+    <button onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- Chat -->
+<div class="chat-screen" id="chat-screen">
+  <div class="chat-header">
+    <div class="header-left">
+      <h2>Tim Chat</h2>
+      <span class="session-timer" id="session-timer">00:00</span>
+    </div>
+    <div class="header-right">
+      <button class="header-btn danger" onclick="endSession()">End Session</button>
+    </div>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="thinking" id="thinking">
+    <div class="thinking-dots"><span></span><span></span><span></span></div>
+    Thinking...
+  </div>
+
+  <div class="input-area">
+    <div class="file-preview" id="file-preview"></div>
+    <div class="input-wrapper">
+      <div class="input-box">
+        <textarea id="message-input" placeholder="Send a message..." rows="1"></textarea>
+      </div>
+      <div class="input-actions">
+        <button class="input-btn" onclick="triggerFileUpload()" title="Upload file">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <button class="input-btn send" onclick="sendMessage()" title="Send">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" multiple accept="*/*" onchange="handleFiles(this.files)">
+</div>
+
+<div class="file-drop-zone" id="file-drop-zone">Drop files here</div>
+
+<script>
+let token = localStorage.getItem("tim_token");
+let ws = null;
+let sessionStart = null;
+let timerInterval = null;
+let currentMsgEl = null;
+let currentMsgId = null;
+let attachedFiles = [];
+let waiting = false;
+
+function renderMarkdown(text) {
+  return text
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/\n/g, '<br>');
+}
+
+async function doLogin() {
+  const user = document.getElementById("login-user").value;
+  const pass = document.getElementById("login-pass").value;
+  const errEl = document.getElementById("login-error");
+  errEl.style.display = "none";
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password: pass }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    token = data.token;
+    localStorage.setItem("tim_token", token);
+    showChat();
+  } catch (e) {
+    errEl.textContent = e.message || "Login failed";
+    errEl.style.display = "block";
+  }
+}
+
+function logout() {
+  token = null;
+  localStorage.removeItem("tim_token");
+  location.reload();
+}
+
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  ws = new WebSocket(`${proto}//${location.host}/ws?token=${token}`);
+  ws.onopen = () => {};
+  ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
+  ws.onclose = (e) => {
+    if (e.code === 4001) { logout(); return; }
+    if (e.code === 4002) { addSystemMessage("Session closed — inactivity timeout."); return; }
+    addSystemMessage("Connection lost. Refresh to reconnect.");
+  };
+  ws.onerror = () => {};
+}
+
+function handleWSMessage(msg) {
+  if (msg.type === "session_start") { sessionStart = msg.startTime; startTimer(); return; }
+  if (msg.type === "timeout") { addSystemMessage("Session closed — inactivity timeout."); return; }
+  if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); return; }
+  if (msg.type === "stderr") { addSystemMessage(msg.text.trim()); return; }
+  if (msg.type !== "claude") return;
+
+  const ev = msg.event;
+
+  if (ev.type === "system" && ev.subtype === "init") {
+    addSystemMessage("Connected. Ready.");
+    setWaiting(false);
+    return;
+  }
+
+  if (ev.type === "assistant") {
+    setWaiting(false);
+    if (!ev.message?.content) return;
+    for (const block of ev.message.content) {
+      if (block.type === "text" && block.text) {
+        if (ev.message.id === currentMsgId && currentMsgEl) {
+          currentMsgEl.querySelector(".message-content").innerHTML = renderMarkdown(block.text);
+          scrollToBottom();
+        } else {
+          currentMsgId = ev.message.id;
+          currentMsgEl = addAssistantMessage(block.text);
+        }
+      }
+      if (block.type === "tool_use") {
+        addToolIndicator(block.name, JSON.stringify(block.input || {}).slice(0, 200));
+      }
+    }
+    if (ev.message.stop_reason) { currentMsgEl = null; currentMsgId = null; }
+    return;
+  }
+
+  if (ev.type === "result") {
+    setWaiting(false);
+    currentMsgEl = null;
+    currentMsgId = null;
+    return;
+  }
+}
+
+function setWaiting(on) {
+  waiting = on;
+  document.getElementById("thinking").className = on ? "thinking active" : "thinking";
+}
+
+function addUserMessage(text) {
+  const div = document.createElement("div");
+  div.className = "message user";
+  div.innerHTML = `<div class="message-label">You</div><div class="message-content">${escapeHtml(text)}</div>`;
+  document.getElementById("messages").appendChild(div);
+  scrollToBottom();
+}
+
+function addAssistantMessage(text) {
+  const div = document.createElement("div");
+  div.className = "message assistant";
+  div.innerHTML = `
+    <div class="message-label">Claude</div>
+    <div class="message-content">${renderMarkdown(text)}</div>
+    <button class="copy-btn" onclick="copyMessage(this)">Copy</button>
+  `;
+  document.getElementById("messages").appendChild(div);
+  scrollToBottom();
+  return div;
+}
+
+function addSystemMessage(text) {
+  const div = document.createElement("div");
+  div.className = "message system";
+  div.textContent = text;
+  document.getElementById("messages").appendChild(div);
+  scrollToBottom();
+}
+
+function addToolIndicator(toolName, inputPreview) {
+  const div = document.createElement("div");
+  div.className = "tool-indicator";
+  div.innerHTML = `<span class="tool-name">${escapeHtml(toolName)}</span> ${escapeHtml(inputPreview || "")}`;
+  document.getElementById("messages").appendChild(div);
+  scrollToBottom();
+}
+
+function copyMessage(btn) {
+  const content = btn.parentElement.querySelector(".message-content").innerText;
+  navigator.clipboard.writeText(content).then(() => {
+    btn.textContent = "Copied!";
+    setTimeout(() => btn.textContent = "Copy", 1500);
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function scrollToBottom() {
+  const msgs = document.getElementById("messages");
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendMessage() {
+  const input = document.getElementById("message-input");
+  const text = input.value.trim();
+  if (!text && attachedFiles.length === 0) return;
+
+  let content = text;
+  if (attachedFiles.length > 0) {
+    const fileInfo = attachedFiles.map(f => `[Attached file: ${f.name} (${f.type || 'unknown'}, ${(f.size/1024).toFixed(1)}KB)]`).join("\n");
+    content = fileInfo + "\n" + text;
+    clearFiles();
+  }
+
+  addUserMessage(text || "(file upload)");
+  setWaiting(true);
+
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "chat", content }));
+  }
+
+  input.value = "";
+  autoResize(input);
+}
+
+const input = document.getElementById("message-input");
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+input.addEventListener("input", () => autoResize(input));
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 200) + "px";
+}
+
+function triggerFileUpload() { document.getElementById("file-input").click(); }
+
+function handleFiles(fileList) {
+  for (const file of fileList) attachedFiles.push(file);
+  renderFilePreview();
+}
+
+function renderFilePreview() {
+  const preview = document.getElementById("file-preview");
+  preview.innerHTML = "";
+  if (attachedFiles.length === 0) { preview.className = "file-preview"; return; }
+  preview.className = "file-preview has-files";
+  attachedFiles.forEach((f, i) => {
+    const chip = document.createElement("div");
+    chip.className = "file-chip";
+    chip.innerHTML = `${escapeHtml(f.name)} <span class="remove" onclick="removeFile(${i})">x</span>`;
+    preview.appendChild(chip);
+  });
+}
+
+function removeFile(i) { attachedFiles.splice(i, 1); renderFilePreview(); }
+function clearFiles() { attachedFiles = []; renderFilePreview(); document.getElementById("file-input").value = ""; }
+
+document.addEventListener("dragover", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.add("active"); });
+document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.getElementById("file-drop-zone").classList.remove("active"); });
+document.addEventListener("drop", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.remove("active"); handleFiles(e.dataTransfer.files); });
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    if (!sessionStart) return;
+    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    const mins = Math.floor(elapsed / 60).toString().padStart(2, "0");
+    const secs = (elapsed % 60).toString().padStart(2, "0");
+    document.getElementById("session-timer").textContent = `${mins}:${secs}`;
+  }, 1000);
+}
+
+function endSession() {
+  if (!confirm("End this session?")) return;
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "end_session" }));
+  addSystemMessage("Ending session...");
+}
+
+function showChat() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("chat-screen").style.display = "flex";
+  connectWS();
+  setTimeout(() => document.getElementById("message-input").focus(), 300);
+}
+
+if (token) showChat();
+
+document.getElementById("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+document.getElementById("login-user").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("login-pass").focus(); });
+
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", () => {
+    document.getElementById("chat-screen").style.height = window.visualViewport.height + "px";
+  });
+}
+</script>
+</body>
+</html>
