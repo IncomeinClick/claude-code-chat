@@ -1,6 +1,6 @@
 # Claude Code Chat
 
-Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI. Talk to Claude Code from your browser instead of the terminal.
+Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI running on a remote server. Access Claude Code from your browser — ideal for VPS, cloud instances, or any headless server where you can't use a terminal directly.
 
 ![Dark theme, mobile-friendly](https://img.shields.io/badge/theme-dark-333?style=flat) ![Single file frontend](https://img.shields.io/badge/frontend-single%20HTML-da7756?style=flat)
 
@@ -10,7 +10,7 @@ Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CL
 - Dark theme inspired by Claude.ai
 - Mobile-friendly with large tap targets
 - File upload via drag-and-drop or button
-- Inactivity countdown timer (counts down to auto-timeout, resets on user activity, turns red under 1 minute)
+- Inactivity countdown timer (starts after first message, resets on user activity, turns red under 1 minute, auto-refreshes on timeout)
 - Copy button on responses
 - Tool use indicators (see what Claude is doing)
 - JWT authentication with bcrypt password hashing
@@ -28,8 +28,8 @@ Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CL
 ## Quick Start
 
 ```bash
-git clone https://github.com/IncomeinClick/tim-chat.git
-cd tim-chat
+git clone https://github.com/IncomeinClick/claude-code-chat.git
+cd claude-code-chat
 bash setup/install.sh
 ```
 
