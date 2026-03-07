@@ -1,4 +1,4 @@
-# Tim Chat
+# Claude Code Chat
 
 Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI. Talk to Claude Code from your browser instead of the terminal.
 
@@ -10,7 +10,7 @@ Web chat UI for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CL
 - Dark theme inspired by Claude.ai
 - Mobile-friendly with large tap targets
 - File upload via drag-and-drop or button
-- Session timer and inactivity timeout
+- Inactivity countdown timer (counts down to auto-timeout, resets on user activity, turns red under 1 minute)
 - Copy button on responses
 - Tool use indicators (see what Claude is doing)
 - JWT authentication with bcrypt password hashing

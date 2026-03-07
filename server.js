@@ -77,7 +77,7 @@ wss.on("connection", (ws, req) => {
     inactivityTimer: null,
   };
   sessions.set(sessionId, session);
-  safeSend(ws, { type: "session_start", sessionId, startTime: session.startTime });
+  safeSend(ws, { type: "session_start", sessionId, startTime: session.startTime, timeoutMs: INACTIVITY_TIMEOUT });
 
   session.claude = null;
 

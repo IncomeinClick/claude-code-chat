@@ -447,9 +447,10 @@ body {
   <div class="chat-header">
     <div class="header-left">
       <h2 id="header-name">Claude Code</h2>
-      <span class="session-timer" id="session-timer">00:00</span>
+      <span class="session-timer" id="session-timer"></span>
     </div>
     <div class="header-right">
+      <button class="header-btn" onclick="location.reload()" title="Refresh">Refresh</button>
       <button class="header-btn danger" onclick="endSession()">End Session</button>
     </div>
   </div>
@@ -488,6 +489,8 @@ let token = localStorage.getItem("tim_token");
 let ws = null;
 let sessionStart = null;
 let timerInterval = null;
+let timeoutMs = 1800000;
+let lastActivity = Date.now();
 let currentMsgEl = null;
 let currentMsgId = null;
 let attachedFiles = [];
@@ -559,7 +562,7 @@ function connectWS() {
 }
 
 function handleWSMessage(msg) {
-  if (msg.type === "session_start") { sessionStart = msg.startTime; startTimer(); return; }
+  if (msg.type === "session_start") { sessionStart = msg.startTime; timeoutMs = msg.timeoutMs || 1800000; lastActivity = Date.now(); startTimer(); return; }
   if (msg.type === "timeout") { addSystemMessage("Session closed — inactivity timeout."); return; }
   if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); return; }
   if (msg.type === "stderr") { addSystemMessage(msg.text.trim()); return; }
@@ -724,13 +727,20 @@ document.addEventListener("dragover", (e) => { e.preventDefault(); document.getE
 document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.getElementById("file-drop-zone").classList.remove("active"); });
 document.addEventListener("drop", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.remove("active"); handleFiles(e.dataTransfer.files); });
 
+function resetActivity() {
+  lastActivity = Date.now();
+}
+document.addEventListener("keydown", resetActivity);
+document.addEventListener("mousedown", resetActivity);
+
 function startTimer() {
   timerInterval = setInterval(() => {
-    if (!sessionStart) return;
-    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
-    const mins = Math.floor(elapsed / 60).toString().padStart(2, "0");
-    const secs = (elapsed % 60).toString().padStart(2, "0");
-    document.getElementById("session-timer").textContent = `${mins}:${secs}`;
+    const remaining = Math.max(0, Math.floor((timeoutMs - (Date.now() - lastActivity)) / 1000));
+    const mins = Math.floor(remaining / 60).toString().padStart(2, "0");
+    const secs = (remaining % 60).toString().padStart(2, "0");
+    const el = document.getElementById("session-timer");
+    el.textContent = `${mins}:${secs} until auto-timeout`;
+    el.style.color = remaining <= 60 ? "#ef4444" : "";
   }, 1000);
 }
 
