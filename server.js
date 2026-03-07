@@ -24,10 +24,15 @@ const CLAUDE_BIN = env.CLAUDE_BIN || "claude";
 const CLAUDE_CWD = env.CLAUDE_CWD || process.env.HOME || "/root";
 const BIND_HOST = env.BIND_HOST || "127.0.0.1";
 const INACTIVITY_TIMEOUT = (parseInt(env.INACTIVITY_TIMEOUT) || 1800) * 1000;
+const DISPLAY_NAME = env.DISPLAY_NAME || "Claude Code";
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/api/config", (req, res) => {
+  res.json({ displayName: DISPLAY_NAME });
+});
 
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;

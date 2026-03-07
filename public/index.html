@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#2b2b2b">
-<title>Tim Chat</title>
+<title>Claude Code Chat</title>
 <style>
 :root {
   --bg-primary: #2b2b2b;
@@ -433,8 +433,8 @@ body {
 <!-- Login -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
-    <h1>Tim Chat</h1>
-    <p>Claude Code Web UI</p>
+    <h1 id="login-title">Claude Code</h1>
+    <p>Chat UI</p>
     <input type="text" id="login-user" placeholder="Username" autocomplete="username">
     <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
     <button onclick="doLogin()">Sign In</button>
@@ -446,7 +446,7 @@ body {
 <div class="chat-screen" id="chat-screen">
   <div class="chat-header">
     <div class="header-left">
-      <h2>Tim Chat</h2>
+      <h2 id="header-name">Claude Code</h2>
       <span class="session-timer" id="session-timer">00:00</span>
     </div>
     <div class="header-right">
@@ -458,14 +458,14 @@ body {
 
   <div class="thinking" id="thinking">
     <div class="thinking-dots"><span></span><span></span><span></span></div>
-    Thinking...
+    <span id="thinking-text">Thinking...</span>
   </div>
 
   <div class="input-area">
     <div class="file-preview" id="file-preview"></div>
     <div class="input-wrapper">
       <div class="input-box">
-        <textarea id="message-input" placeholder="Send a message..." rows="1"></textarea>
+        <textarea id="message-input" placeholder="Send a message..." rows="1" autocomplete="off"></textarea>
       </div>
       <div class="input-actions">
         <button class="input-btn" onclick="triggerFileUpload()" title="Upload file">
@@ -492,6 +492,16 @@ let currentMsgEl = null;
 let currentMsgId = null;
 let attachedFiles = [];
 let waiting = false;
+let displayName = "Claude Code";
+
+// Fetch display name from server
+fetch("/api/config").then(r => r.json()).then(c => {
+  displayName = c.displayName || "Claude Code";
+  document.title = displayName + " Chat";
+  document.getElementById("login-title").textContent = displayName;
+  document.getElementById("header-name").textContent = displayName;
+  document.getElementById("thinking-text").textContent = displayName + " is thinking...";
+}).catch(() => {});
 
 function renderMarkdown(text) {
   return text
@@ -609,7 +619,7 @@ function addAssistantMessage(text) {
   const div = document.createElement("div");
   div.className = "message assistant";
   div.innerHTML = `
-    <div class="message-label">Claude</div>
+    <div class="message-label">${escapeHtml(displayName)}</div>
     <div class="message-content">${renderMarkdown(text)}</div>
     <button class="copy-btn" onclick="copyMessage(this)">Copy</button>
   `;

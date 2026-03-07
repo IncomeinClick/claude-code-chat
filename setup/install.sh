@@ -57,6 +57,8 @@ else
   read -p "Login username: " TC_USER
   read -s -p "Login password: " TC_PASS
   echo ""
+  read -p "Display name in UI [Claude Code]: " TC_NAME
+  TC_NAME="${TC_NAME:-Claude Code}"
 
   JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
   PASS_HASH=$(node -e "require('bcryptjs').hash(process.argv[1],10).then(console.log)" "$TC_PASS")
@@ -69,6 +71,7 @@ PORT=3456
 BIND_HOST=127.0.0.1
 CLAUDE_BIN=claude
 CLAUDE_CWD=$HOME_DIR
+DISPLAY_NAME=$TC_NAME
 INACTIVITY_TIMEOUT=1800
 ENVEOF
 
