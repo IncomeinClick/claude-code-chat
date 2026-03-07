@@ -555,14 +555,14 @@ function connectWS() {
   ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
   ws.onclose = (e) => {
     if (e.code === 4001) { logout(); return; }
-    if (e.code === 4002) { addSystemMessage("Session closed — inactivity timeout."); return; }
+    if (e.code === 4002) { location.reload(); return; }
     addSystemMessage("Connection lost. Refresh to reconnect.");
   };
   ws.onerror = () => {};
 }
 
 function handleWSMessage(msg) {
-  if (msg.type === "session_start") { sessionStart = msg.startTime; timeoutMs = msg.timeoutMs || 1800000; lastActivity = Date.now(); startTimer(); return; }
+  if (msg.type === "session_start") { sessionStart = msg.startTime; timeoutMs = msg.timeoutMs || 1800000; return; }
   if (msg.type === "timeout") { addSystemMessage("Session closed — inactivity timeout."); return; }
   if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); return; }
   if (msg.type === "stderr") { addSystemMessage(msg.text.trim()); return; }
@@ -680,6 +680,7 @@ function sendMessage() {
 
   addUserMessage(text || "(file upload)");
   setWaiting(true);
+  if (!timerInterval) { lastActivity = Date.now(); startTimer(); }
 
   if (ws && ws.readyState === 1) {
     ws.send(JSON.stringify({ type: "chat", content }));

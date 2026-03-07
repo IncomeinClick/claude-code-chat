@@ -142,8 +142,6 @@ wss.on("connection", (ws, req) => {
       ws.close(4002, "Inactivity timeout");
     }, INACTIVITY_TIMEOUT);
   }
-  resetInactivityTimer();
-
   ws.on("message", (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
