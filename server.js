@@ -111,6 +111,71 @@ function verifyToken(token) {
   try { return jwt.verify(token, JWT_SECRET); } catch { return null; }
 }
 
+// Re-authentication flow
+let reauthState = null; // { proc, url, status, startTime }
+
+app.post("/api/reauth", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !verifyToken(authHeader.replace("Bearer ", ""))) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  // If already running, return current state
+  if (reauthState && reauthState.status === "running") {
+    return res.json({ status: "running", url: reauthState.url });
+  }
+
+  const proc = spawn("python3", [
+    path.join(__dirname, "auth-helper.py"), CLAUDE_BIN
+  ], { cwd: CLAUDE_CWD, env: cleanEnv(), stdio: ["ignore", "pipe", "pipe"] });
+
+  reauthState = { proc, url: null, status: "running", startTime: Date.now() };
+
+  let buf = "";
+  proc.stdout.on("data", (chunk) => {
+    buf += chunk.toString();
+    const lines = buf.split("\n");
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        if (msg.status === "url") reauthState.url = msg.url;
+        if (msg.status === "done") {
+          reauthState.status = msg.exit_code === 0 ? "success" : "failed";
+        }
+      } catch {}
+    }
+  });
+
+  proc.on("close", (code) => {
+    if (reauthState && reauthState.status === "running") {
+      reauthState.status = code === 0 ? "success" : "failed";
+    }
+    console.log(`[reauth] Process exited: ${code}, status: ${reauthState?.status}`);
+  });
+
+  // Safety timeout
+  setTimeout(() => {
+    if (reauthState?.status === "running") {
+      proc.kill();
+      reauthState.status = "failed";
+    }
+  }, 130000);
+
+  res.json({ status: "started" });
+});
+
+app.get("/api/reauth/status", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !verifyToken(authHeader.replace("Bearer ", ""))) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (!reauthState) return res.json({ status: "idle" });
+  res.json({ status: reauthState.status, url: reauthState.url });
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 const sessions = new Map();

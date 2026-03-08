@@ -468,6 +468,41 @@ body {
   text-align: center;
 }
 
+/* Reauth banner */
+.reauth-banner {
+  display: none;
+  background: rgba(227, 167, 101, 0.15);
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 8px 20px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.reauth-banner.active { display: block; }
+.reauth-link {
+  color: var(--accent);
+  text-decoration: underline;
+  word-break: break-all;
+  font-size: 13px;
+}
+.reauth-btn {
+  padding: 10px 20px;
+  background: var(--warning);
+  color: #1e1e1e;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 8px;
+  display: inline-block;
+}
+.reauth-btn:hover { opacity: 0.9; }
+
 /* Mobile */
 @media (max-width: 640px) {
   .message { padding: 12px 14px; }
@@ -520,6 +555,13 @@ body {
     <div class="header-right">
       <button class="header-btn" onclick="location.reload()" title="Refresh">Refresh</button>
       <button class="header-btn danger" onclick="endSession()">End Session</button>
+    </div>
+  </div>
+
+  <div class="reauth-banner" id="reauth-banner">
+    <div id="reauth-content">
+      <strong>Authentication expired.</strong><br>
+      <button class="reauth-btn" onclick="startReauth()">Re-authenticate</button>
     </div>
   </div>
 
@@ -663,7 +705,11 @@ function handleWSMessage(msg) {
   if (msg.type === "timeout") { addSystemMessage("Session closed — inactivity timeout."); return; }
   if (msg.type === "stopped") { setWaiting(false); addSystemMessage("Stopped."); return; }
   if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); return; }
-  if (msg.type === "stderr") { addSystemMessage(msg.text.trim()); return; }
+  if (msg.type === "stderr") {
+    addSystemMessage(msg.text.trim());
+    if (isAuthError(msg.text)) showReauthBanner();
+    return;
+  }
   if (msg.type !== "claude") return;
 
   const ev = msg.event;
@@ -988,6 +1034,78 @@ if (token) showChat();
 
 document.getElementById("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 document.getElementById("login-user").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("login-pass").focus(); });
+
+// Re-authentication
+let reauthPolling = null;
+
+function isAuthError(text) {
+  const lower = text.toLowerCase();
+  return lower.includes('unauthorized') || lower.includes('not authenticated') ||
+    lower.includes('token expired') || lower.includes('invalid token') ||
+    lower.includes('auth token') || lower.includes('please login') ||
+    lower.includes('api key') || lower.includes('authentication failed') ||
+    lower.includes('401') || lower.includes('oauth');
+}
+
+function showReauthBanner() {
+  const banner = document.getElementById('reauth-banner');
+  if (banner.classList.contains('active')) return;
+  banner.classList.add('active');
+  document.getElementById('reauth-content').innerHTML =
+    '<strong>Authentication expired.</strong><br>' +
+    '<button class="reauth-btn" onclick="startReauth()">Re-authenticate</button>';
+}
+
+async function startReauth() {
+  document.getElementById('reauth-content').innerHTML =
+    '<strong>Starting re-authentication...</strong>';
+  try {
+    const res = await fetch('/api/reauth', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.url) showReauthLink(data.url);
+    if (reauthPolling) clearInterval(reauthPolling);
+    reauthPolling = setInterval(pollReauthStatus, 2000);
+  } catch (e) {
+    document.getElementById('reauth-content').innerHTML =
+      '<strong>Failed to start re-authentication.</strong><br>' +
+      '<button class="reauth-btn" onclick="startReauth()">Try Again</button>';
+  }
+}
+
+async function pollReauthStatus() {
+  try {
+    const res = await fetch('/api/reauth/status', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.url && !document.getElementById('reauth-link')) {
+      showReauthLink(data.url);
+    }
+    if (data.status === 'success') {
+      clearInterval(reauthPolling);
+      reauthPolling = null;
+      document.getElementById('reauth-banner').classList.remove('active');
+      addSystemMessage('Re-authentication successful! You can continue chatting.');
+    } else if (data.status === 'failed') {
+      clearInterval(reauthPolling);
+      reauthPolling = null;
+      document.getElementById('reauth-content').innerHTML =
+        '<strong>Re-authentication failed or timed out.</strong><br>' +
+        '<button class="reauth-btn" onclick="startReauth()">Try Again</button>';
+    }
+  } catch {}
+}
+
+function showReauthLink(url) {
+  document.getElementById('reauth-content').innerHTML =
+    '<strong>Tap the link below to re-authenticate:</strong><br><br>' +
+    '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" class="reauth-link" id="reauth-link">' +
+    escapeHtml(url.substring(0, 70)) + '...</a><br><br>' +
+    '<small style="color:var(--text-muted)">Waiting for authorization... Come back here after approving.</small>';
+}
 
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", () => {
