@@ -49,6 +49,7 @@ app.get("/api/sessions", (req, res) => {
     for (const file of files) {
       const sid = file.replace(".jsonl", "");
       const fullPath = path.join(sessionDir, file);
+      const mtime = fs.statSync(fullPath).mtime.toISOString();
       let firstUserMsg = null;
       let timestamp = null;
 
@@ -85,12 +86,12 @@ app.get("/api/sessions", (req, res) => {
         }
 
         if (firstUserMsg) {
-          sessions.push({ id: sid, timestamp: timestamp || "unknown", summary: firstUserMsg });
+          sessions.push({ id: sid, timestamp: timestamp || "unknown", lastActive: mtime, summary: firstUserMsg });
         }
       } catch {}
     }
 
-    sessions.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+    sessions.sort((a, b) => (b.lastActive || "").localeCompare(a.lastActive || ""));
     res.json({ sessions: sessions.slice(0, 20) });
   } catch (e) {
     res.json({ sessions: [] });

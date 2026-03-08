@@ -645,14 +645,11 @@ function connectWS() {
     if (e.code === 4001) { logout(); return; }
     if (e.code === 4002) { location.reload(); return; }
     if (e.code === 1000 || intentionalClose) { intentionalClose = false; return; }
-    // Auto-reconnect with backoff
-    reconnectAttempts++;
-    const delay = Math.min(2000 * reconnectAttempts, 15000);
-    addSystemMessage(`Connection lost. Reconnecting in ${Math.round(delay/1000)}s...`);
-    reconnectTimer = setTimeout(() => {
-      resumeSessionId = claudeSessionId;
-      connectWS();
-    }, delay);
+    // Connection lost — reset UI so user isn't stuck
+    setWaiting(false);
+    currentMsgEl = null;
+    currentMsgId = null;
+    addSystemMessage("Connection lost. Send a message to reconnect, or refresh to start over.");
   };
   ws.onerror = () => {};
   ws.onopen = ((origOnopen) => function() {
