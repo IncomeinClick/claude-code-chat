@@ -107,6 +107,10 @@ body {
   display: none;
   flex-direction: column;
   height: 100dvh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 /* Header */
@@ -447,9 +451,10 @@ body {
 }
 
 .session-item .session-summary {
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   font-size: 14px;
   line-height: 1.4;
 }
@@ -512,7 +517,35 @@ body {
   .input-area { padding: 8px 14px 12px; }
 }
 
-#file-input { display: none; }
+#file-input { position: absolute; left: -9999px; opacity: 0; width: 1px; height: 1px; }
+
+/* Compacting indicator */
+.compacting-banner {
+  display: none;
+  max-width: 800px;
+  margin: 4px auto;
+  padding: 10px 16px;
+  background: rgba(227, 167, 101, 0.1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--warning);
+  font-size: 13px;
+  text-align: center;
+  animation: pulse-opacity 2s ease-in-out infinite;
+}
+.compacting-banner.active { display: block; }
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Pasted image preview */
+.file-chip img.paste-thumb {
+  max-height: 40px;
+  max-width: 60px;
+  border-radius: 4px;
+  object-fit: cover;
+}
 </style>
 </head>
 <body>
@@ -567,32 +600,34 @@ body {
 
   <div class="messages" id="messages"></div>
 
+  <div class="compacting-banner" id="compacting-banner">Compacting conversation... this may take a moment</div>
+
   <div class="thinking" id="thinking">
     <div class="thinking-dots"><span></span><span></span><span></span></div>
     <span id="thinking-text">Thinking...</span>
   </div>
 
-  <div class="input-area">
+  <form class="input-area" id="chat-form" action="javascript:void(0)">
     <div class="file-preview" id="file-preview"></div>
     <div class="input-wrapper">
       <div class="input-box">
         <textarea id="message-input" placeholder="Send a message..." rows="1" autocomplete="off"></textarea>
       </div>
       <div class="input-actions">
-        <button class="input-btn" onclick="triggerFileUpload()" title="Upload file">
+        <button type="button" class="input-btn" onclick="triggerFileUpload()" title="Upload file">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
         </button>
-        <button class="input-btn send" id="send-btn" onclick="sendMessage()" title="Send">
+        <button type="submit" class="input-btn send" id="send-btn" title="Send">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
-        <button class="input-btn stop" id="stop-btn" onclick="stopResponse()" title="Stop">
+        <button type="button" class="input-btn stop" id="stop-btn" onclick="stopResponse()" title="Stop">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         </button>
       </div>
     </div>
-  </div>
+  </form>
 
-  <input type="file" id="file-input" multiple accept="*/*" onchange="handleFiles(this.files)">
+  <input type="file" id="file-input" multiple accept="image/*,text/*,.pdf,.json,.csv,.log,.js,.py,.html,.css">
 </div>
 
 <div class="file-drop-zone" id="file-drop-zone">Drop files here</div>
@@ -611,11 +646,12 @@ let waiting = false;
 let displayName = "Claude Code";
 let resumeSessionId = null;
 let pendingMessage = null;
-let claudeSessionId = null;
+let claudeSessionId = localStorage.getItem("tim_claude_session") || null;
 let initReceived = false;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
 let intentionalClose = false;
+let serverSessionId = null; // the session ID on the server side
 
 // Fetch display name from server
 fetch("/api/config").then(r => r.json()).then(c => {
@@ -669,11 +705,12 @@ function logout() {
   location.reload();
 }
 
-function connectWS() {
+function connectWS(reattachId) {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   const resumeParam = resumeSessionId ? `&resume=${encodeURIComponent(resumeSessionId)}` : "";
+  const reattachParam = reattachId ? `&reattach=${encodeURIComponent(reattachId)}` : "";
   initReceived = false;
-  ws = new WebSocket(`${proto}//${location.host}/ws?token=${token}${resumeParam}`);
+  ws = new WebSocket(`${proto}//${location.host}/ws?token=${token}${resumeParam}${reattachParam}`);
   ws.onopen = () => {
     // Send pending message immediately — server spawns Claude on first chat msg
     if (pendingMessage) {
@@ -684,29 +721,54 @@ function connectWS() {
   };
   ws.onmessage = (e) => handleWSMessage(JSON.parse(e.data));
   ws.onclose = (e) => {
+    reconnecting = false;
     if (e.code === 4001) { logout(); return; }
     if (e.code === 4002) { location.reload(); return; }
-    if (e.code === 1000 || intentionalClose) { intentionalClose = false; return; }
-    // Connection lost — reset UI so user isn't stuck
+    if (e.code === 1000 || intentionalClose) { intentionalClose = false; serverSessionId = null; return; }
+    // Connection lost — reset UI and auto-reconnect with retry
     setWaiting(false);
-    currentMsgEl = null;
-    currentMsgId = null;
-    addSystemMessage("Connection lost. Send a message to reconnect, or refresh to start over.");
+    addSystemMessage("Connection lost — reconnecting...");
+    scheduleReconnect();
   };
-  ws.onerror = () => {};
+  ws.onerror = () => { reconnecting = false; };
   ws.onopen = ((origOnopen) => function() {
+    reconnecting = false;
     reconnectAttempts = 0;
     origOnopen.call(this);
   })(ws.onopen);
 }
 
 function handleWSMessage(msg) {
-  if (msg.type === "session_start") { sessionStart = msg.startTime; timeoutMs = msg.timeoutMs || 1800000; return; }
+  if (msg.type === "session_start") {
+    serverSessionId = msg.sessionId;
+    sessionStart = msg.startTime;
+    timeoutMs = msg.timeoutMs || 1800000;
+    return;
+  }
+  if (msg.type === "reattached") {
+    addSystemMessage("Reconnected.");
+    // Replay buffered events from while we were disconnected
+    if (msg.bufferedEvents && msg.bufferedEvents.length > 0) {
+      for (const ev of msg.bufferedEvents) handleWSMessage(ev);
+    }
+    // Only show thinking if server confirms Claude is still running
+    if (msg.claudeRunning && !waiting) {
+      setWaiting(true);
+    } else if (!msg.claudeRunning) {
+      setWaiting(false);
+    }
+    return;
+  }
   if (msg.type === "timeout") { addSystemMessage("Session closed — inactivity timeout."); return; }
   if (msg.type === "stopped") { setWaiting(false); addSystemMessage("Stopped."); return; }
-  if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); return; }
+  if (msg.type === "exit") { setWaiting(false); addSystemMessage("Session ended."); serverSessionId = null; return; }
   if (msg.type === "stderr") {
-    addSystemMessage(msg.text.trim());
+    const text = msg.text.trim();
+    if (/compact/i.test(text)) {
+      document.getElementById("compacting-banner").classList.add("active");
+      return;
+    }
+    addSystemMessage(text);
     if (isAuthError(msg.text)) showReauthBanner();
     return;
   }
@@ -715,7 +777,11 @@ function handleWSMessage(msg) {
   const ev = msg.event;
 
   if (ev.type === "system" && ev.subtype === "init") {
-    if (ev.session_id) claudeSessionId = ev.session_id;
+    if (ev.session_id) {
+      claudeSessionId = ev.session_id;
+      localStorage.setItem("tim_claude_session", ev.session_id);
+      localStorage.setItem("tim_claude_session_time", Date.now().toString());
+    }
     if (!initReceived) {
       initReceived = true;
       addSystemMessage("Connected. Ready.");
@@ -724,6 +790,7 @@ function handleWSMessage(msg) {
   }
 
   if (ev.type === "assistant") {
+    document.getElementById("compacting-banner").classList.remove("active");
     if (!ev.message?.content) return;
     for (const block of ev.message.content) {
       if (block.type === "text" && block.text) {
@@ -744,6 +811,7 @@ function handleWSMessage(msg) {
   }
 
   if (ev.type === "result") {
+    document.getElementById("compacting-banner").classList.remove("active");
     setWaiting(false);
     currentMsgEl = null;
     currentMsgId = null;
@@ -770,7 +838,7 @@ function playNotificationSound() {
 function notifyDone() {
   if (document.hidden) {
     playNotificationSound();
-    if (Notification.permission === "granted") {
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
       new Notification(displayName, { body: "Done! Tap to view.", icon: "" });
     }
   }
@@ -854,22 +922,26 @@ function sendMessage() {
 
   let content = text;
   if (attachedFiles.length > 0) {
-    const fileInfo = attachedFiles.map(f => `[Attached file: ${f.name} (${f.type || 'unknown'}, ${(f.size/1024).toFixed(1)}KB)]`).join("\n");
-    content = fileInfo + "\n" + text;
+    const fileInfo = attachedFiles.map(f => {
+      if (f.serverPath) {
+        const isImage = f.type && f.type.startsWith("image/");
+        return `[File uploaded: ${f.serverPath}${isImage ? " (image — please read this file to see it)" : ""}]`;
+      }
+      return `[Attached file: ${f.name} (${f.type || 'unknown'}, ${(f.size/1024).toFixed(1)}KB)]`;
+    }).join("\n");
+    content = fileInfo + (text ? "\n" + text : "");
     clearFiles();
   }
 
-  if (Notification.permission === "default") Notification.requestPermission();
+  if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission();
   addUserMessage(text || "(file upload)");
   setWaiting(true);
   if (!timerInterval) { lastActivity = Date.now(); startTimer(); }
 
-  // If WS is dead, start a new session and send the message once connected
+  // If WS is dead, try to reattach to detached session first
   if (!ws || ws.readyState !== 1) {
-    addSystemMessage("Resuming session...");
-    resumeSessionId = claudeSessionId;
     pendingMessage = content;
-    connectWS();
+    tryReattachOrReconnect();
   } else {
     ws.send(JSON.stringify({ type: "chat", content }));
   }
@@ -879,20 +951,73 @@ function sendMessage() {
 }
 
 const input = document.getElementById("message-input");
+
+// Enter to send (Shift+Enter for newline). Works on iOS via form submit as fallback.
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 input.addEventListener("input", () => autoResize(input));
+
+// Form submit — most reliable on iOS. Handles both send button tap and Enter key.
+document.getElementById("chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  sendMessage();
+});
+
+// No touchstart preventDefault — it blocks click/submit on iOS
 
 function autoResize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 200) + "px";
 }
 
-function triggerFileUpload() { document.getElementById("file-input").click(); }
+function triggerFileUpload() {
+  const fi = document.getElementById("file-input");
+  fi.value = ""; // reset so same file triggers change
+  fi.click();
+}
 
-function handleFiles(fileList) {
-  for (const file of fileList) attachedFiles.push(file);
+// File input change handler — use addEventListener (more reliable on mobile than onchange attr)
+document.getElementById("file-input").addEventListener("change", function() {
+  const files = Array.from(this.files);
+  if (files.length === 0) return;
+  uploadFiles(files);
+});
+
+async function uploadFiles(files) {
+  for (const file of files) {
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+      });
+      const base64 = result.split(",")[1];
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({ data: base64, filename: file.name, type: file.type }),
+      });
+      if (!res.ok) {
+        addSystemMessage("Upload failed: HTTP " + res.status);
+        continue;
+      }
+      const data = await res.json();
+      if (data.path) {
+        const isImage = file.type.startsWith("image/");
+        attachedFiles.push({
+          name: file.name, type: file.type, size: file.size,
+          serverPath: data.path,
+          thumbUrl: isImage ? result : null,
+        });
+      } else {
+        addSystemMessage("Upload failed: " + (data.error || "unknown error"));
+      }
+    } catch (err) {
+      addSystemMessage("Upload failed: " + err.message);
+    }
+  }
   renderFilePreview();
 }
 
@@ -904,7 +1029,8 @@ function renderFilePreview() {
   attachedFiles.forEach((f, i) => {
     const chip = document.createElement("div");
     chip.className = "file-chip";
-    chip.innerHTML = `${escapeHtml(f.name)} <span class="remove" onclick="removeFile(${i})">x</span>`;
+    const thumb = f.thumbUrl ? `<img class="paste-thumb" src="${f.thumbUrl}"> ` : "";
+    chip.innerHTML = `${thumb}${escapeHtml(f.name)} <span class="remove" onclick="removeFile(${i})">x</span>`;
     preview.appendChild(chip);
   });
 }
@@ -914,7 +1040,40 @@ function clearFiles() { attachedFiles = []; renderFilePreview(); document.getEle
 
 document.addEventListener("dragover", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.add("active"); });
 document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) document.getElementById("file-drop-zone").classList.remove("active"); });
-document.addEventListener("drop", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.remove("active"); handleFiles(e.dataTransfer.files); });
+document.addEventListener("drop", (e) => { e.preventDefault(); document.getElementById("file-drop-zone").classList.remove("active"); uploadFiles(Array.from(e.dataTransfer.files)); });
+
+// Paste handler — capture images from clipboard (screenshots)
+document.addEventListener("paste", async (e) => {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (!item.type.startsWith("image/")) continue;
+    e.preventDefault();
+    const blob = item.getAsFile();
+    if (!blob) continue;
+    const ext = blob.type.split("/")[1] || "png";
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result.split(",")[1];
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+          body: JSON.stringify({ data: base64, filename: `screenshot.${ext}`, type: blob.type }),
+        });
+        const data = await res.json();
+        if (data.path) {
+          // Store as attached file with server path
+          attachedFiles.push({ name: `screenshot.${ext}`, type: blob.type, size: blob.size, serverPath: data.path, thumbUrl: reader.result });
+          renderFilePreview();
+        }
+      } catch (err) {
+        addSystemMessage("Failed to upload screenshot.");
+      }
+    };
+    reader.readAsDataURL(blob);
+  }
+});
 
 function resetActivity() {
   lastActivity = Date.now();
@@ -936,6 +1095,8 @@ function startTimer() {
 function endSession() {
   if (!confirm("End this session?")) return;
   intentionalClose = true;
+  localStorage.removeItem("tim_claude_session");
+  localStorage.removeItem("tim_claude_session_time");
   if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: "end_session" }));
   addSystemMessage("Ending session...");
 }
@@ -983,9 +1144,9 @@ async function loadSessionList() {
       btn.dataset.sessionId = s.id;
       btn.dataset.index = i;
       const time = formatSessionTime(s.timestamp);
-      btn.innerHTML = `<div class="session-summary">${escapeHtml(s.summary)}</div><div class="session-time">${escapeHtml(time)}</div>`;
+      const msgBadge = s.msgCount ? `<span style="color:var(--accent);font-size:11px;margin-left:6px;">${s.msgCount} msgs</span>` : "";
+      btn.innerHTML = `<div class="session-summary">${escapeHtml(s.summary)}</div><div class="session-time">${escapeHtml(time)}${msgBadge}</div>`;
       btn.onclick = () => startSession(s.id);
-      // Swipe/touch support: highlight on touch
       btn.ontouchstart = () => { highlightSession(i); };
       listEl.appendChild(btn);
     });
@@ -1107,11 +1268,108 @@ function showReauthLink(url) {
     '<small style="color:var(--text-muted)">Waiting for authorization... Come back here after approving.</small>';
 }
 
+// iOS keyboard handling: keep input area visible and pinned to bottom
 if (window.visualViewport) {
-  window.visualViewport.addEventListener("resize", () => {
-    document.getElementById("chat-screen").style.height = window.visualViewport.height + "px";
-  });
+  function adjustForKeyboard() {
+    const chatScreen = document.getElementById("chat-screen");
+    if (chatScreen.style.display !== "flex") return;
+    const vvh = window.visualViewport.height;
+    const vvo = window.visualViewport.offsetTop;
+    chatScreen.style.height = vvh + "px";
+    chatScreen.style.transform = `translateY(${vvo}px)`;
+  }
+  window.visualViewport.addEventListener("resize", adjustForKeyboard);
+  window.visualViewport.addEventListener("scroll", adjustForKeyboard);
 }
+
+// Auto-reconnect with backoff
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectAttempts++;
+  const delay = Math.min(2000 * reconnectAttempts, 10000); // 2s, 4s, 6s... max 10s
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    if (ws && ws.readyState === 1) return;
+    if (document.getElementById("chat-screen").style.display !== "flex") return;
+    tryReattachOrReconnect();
+  }, delay);
+}
+
+// Shared reconnection logic — checks for detached session first, falls back to resume
+let reconnecting = false;
+async function tryReattachOrReconnect() {
+  if (reconnecting) return;
+  if (ws && ws.readyState === 1) return; // already connected
+  reconnecting = true;
+  try {
+    const res = await fetch("/api/detached", { headers: { "Authorization": "Bearer " + token } });
+    const data = await res.json();
+    if (data.sessions && data.sessions.length > 0) {
+      const reattachId = data.sessions[0];
+      addSystemMessage("Reconnecting to running session...");
+      connectWS(reattachId);
+      return;
+    }
+  } catch (e) {
+    console.log("Detached check failed:", e);
+    // Server might be down — retry
+    reconnecting = false;
+    if (reconnectAttempts < 15) scheduleReconnect();
+    else addSystemMessage("Could not reconnect. Refresh the page to try again.");
+    return;
+  }
+  // No detached session — Claude is gone. Reset UI state and reconnect fresh.
+  setWaiting(false);
+  resumeSessionId = claudeSessionId;
+
+  // Fetch session history to replay missed messages
+  if (claudeSessionId) {
+    try {
+      const histRes = await fetch(`/api/session-history/${encodeURIComponent(claudeSessionId)}`, {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      const histData = await histRes.json();
+      if (histData.messages && histData.messages.length > 0) {
+        // Count how many messages the UI already has
+        const existingMsgs = document.querySelectorAll("#messages .message.user, #messages .message.assistant").length;
+        const newMsgs = histData.messages.slice(existingMsgs);
+        if (newMsgs.length > 0) {
+          addSystemMessage("Replaying missed messages...");
+          for (const m of newMsgs) {
+            if (m.role === "user") addUserMessage(m.text);
+            else if (m.role === "assistant") addAssistantMessage(m.text);
+          }
+        }
+      }
+    } catch {}
+  }
+
+  addSystemMessage("Reconnected. Send a message to continue.");
+  connectWS();
+}
+
+// Auto-reconnect when page becomes visible again (e.g. switching back from another app)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (!token) return;
+  if (ws && ws.readyState === 1) return;
+  if (document.getElementById("chat-screen").style.display !== "flex") return;
+  tryReattachOrReconnect();
+});
+
+// Also try reconnecting on focus and pageshow (some mobile browsers don't fire visibilitychange reliably)
+window.addEventListener("focus", () => {
+  if (!token) return;
+  if (ws && ws.readyState === 1) return;
+  if (document.getElementById("chat-screen").style.display !== "flex") return;
+  setTimeout(tryReattachOrReconnect, 300);
+});
+window.addEventListener("pageshow", (e) => {
+  if (!token) return;
+  if (ws && ws.readyState === 1) return;
+  if (document.getElementById("chat-screen").style.display !== "flex") return;
+  setTimeout(tryReattachOrReconnect, 300);
+});
 </script>
 </body>
 </html>
