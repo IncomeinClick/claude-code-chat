@@ -100,6 +100,37 @@ Browser  <--WebSocket-->  Node.js server  <--stdin/stdout-->  Claude Code CLI
 - **Frontend:** Single `public/index.html` file. No framework, no build step. Vanilla JS + CSS.
 - **Auth:** JWT token stored in localStorage, bcrypt-hashed password in `.env`.
 
+## Claude Code Permissions
+
+Claude Code requires pre-approved permissions to take actions (read/write files, run commands) without interactive confirmation. Since the chat UI can't prompt for approval, permissions must be configured in advance.
+
+This repo includes `.claude/settings.json` with a default allowlist. When `CLAUDE_CWD` points to this project directory, Claude Code will automatically pick up these permissions.
+
+**How it works:**
+- `.claude/settings.json` (project-level) — shipped with the repo, applies when Claude runs in this directory
+- `~/.claude/settings.json` (user-level) — optional, applies globally for the user regardless of working directory
+
+**If Claude is blocked from taking actions**, either:
+1. Set `CLAUDE_CWD` to the project directory (where `.claude/settings.json` lives) in your `.env`
+2. Or copy `.claude/settings.json` to `~/.claude/settings.json` on the server
+
+**To customize permissions**, edit `.claude/settings.json`. Format:
+```json
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Bash(git *)",
+      "..."
+    ]
+  }
+}
+```
+
+See [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for the full list of permission patterns.
+
 ## Security Notes
 
 - Listens on `127.0.0.1` by default — put behind a reverse proxy with HTTPS for production
