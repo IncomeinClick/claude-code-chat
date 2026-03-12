@@ -952,9 +952,11 @@ function sendMessage() {
 
 const input = document.getElementById("message-input");
 
-// Enter to send (Shift+Enter for newline). Works on iOS via form submit as fallback.
+// Desktop: Enter to send, Shift+Enter for newline.
+// Mobile: Enter always inserts newline (send via button only).
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || ('ontouchstart' in window && window.innerWidth < 768);
 input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === "Enter" && !isMobile && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 input.addEventListener("input", () => autoResize(input));
 
@@ -1304,10 +1306,9 @@ async function tryReattachOrReconnect() {
   try {
     const res = await fetch("/api/detached", { headers: { "Authorization": "Bearer " + token } });
     const data = await res.json();
-    if (data.sessions && data.sessions.length > 0) {
-      const reattachId = data.sessions[0];
+    if (data.sessions && data.sessions.length > 0 && serverSessionId && data.sessions.includes(serverSessionId)) {
       addSystemMessage("Reconnecting to running session...");
-      connectWS(reattachId);
+      connectWS(serverSessionId);
       return;
     }
   } catch (e) {
