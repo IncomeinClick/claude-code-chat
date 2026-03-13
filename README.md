@@ -76,13 +76,13 @@ npm start
 
 ## Nginx + HTTPS
 
-Template config is in `setup/nginx-tim-chat.conf`. To set up:
+Template config is in `setup/nginx-claude-code-chat.conf`. To set up:
 
 ```bash
 # Copy and edit the config
-sudo cp setup/nginx-tim-chat.conf /etc/nginx/sites-available/tim-chat
-sudo sed -i 's/__DOMAIN__/chat.example.com/g' /etc/nginx/sites-available/tim-chat
-sudo ln -s /etc/nginx/sites-available/tim-chat /etc/nginx/sites-enabled/
+sudo cp setup/nginx-claude-code-chat.conf /etc/nginx/sites-available/claude-code-chat
+sudo sed -i 's/__DOMAIN__/chat.example.com/g' /etc/nginx/sites-available/claude-code-chat
+sudo ln -s /etc/nginx/sites-available/claude-code-chat /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 # Add SSL

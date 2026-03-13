@@ -1,5 +1,5 @@
 [Unit]
-Description=Tim Chat - Claude Code Web UI
+Description=Claude Code Chat - Web UI
 After=network.target
 
 [Service]
@@ -12,7 +12,7 @@ Environment=HOME=__HOME_DIR__
 Environment=PATH=__HOME_DIR__/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=tim-chat
+SyslogIdentifier=claude-code-chat
 
 [Install]
 WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Tim Chat — Setup ==="
+echo "=== Claude Code Chat — Setup ==="
 echo ""
 
 # Check Node.js
@@ -83,12 +83,12 @@ echo ""
 # Systemd service
 read -p "Install systemd service? [y/N] " INSTALL_SVC
 if [[ "$INSTALL_SVC" =~ ^[Yy] ]]; then
-  SVC_FILE="/etc/systemd/system/tim-chat.service"
+  SVC_FILE="/etc/systemd/system/claude-code-chat.service"
   sed "s|__INSTALL_DIR__|$INSTALL_DIR|g; s|__HOME_DIR__|$HOME_DIR|g" \
-    "$INSTALL_DIR/setup/tim-chat.service" | sudo tee "$SVC_FILE" > /dev/null
+    "$INSTALL_DIR/setup/claude-code-chat.service" | sudo tee "$SVC_FILE" > /dev/null
   sudo systemctl daemon-reload
-  sudo systemctl enable tim-chat
-  sudo systemctl start tim-chat
+  sudo systemctl enable claude-code-chat
+  sudo systemctl start claude-code-chat
   echo "Service installed and started."
 fi
 
@@ -98,10 +98,10 @@ echo ""
 read -p "Install nginx config? [y/N] " INSTALL_NGX
 if [[ "$INSTALL_NGX" =~ ^[Yy] ]]; then
   read -p "Domain name (e.g. chat.example.com): " DOMAIN
-  NGX_FILE="/etc/nginx/sites-available/tim-chat"
+  NGX_FILE="/etc/nginx/sites-available/claude-code-chat"
   sed "s|__DOMAIN__|$DOMAIN|g" \
-    "$INSTALL_DIR/setup/nginx-tim-chat.conf" | sudo tee "$NGX_FILE" > /dev/null
-  sudo ln -sf "$NGX_FILE" /etc/nginx/sites-enabled/tim-chat
+    "$INSTALL_DIR/setup/nginx-claude-code-chat.conf" | sudo tee "$NGX_FILE" > /dev/null
+  sudo ln -sf "$NGX_FILE" /etc/nginx/sites-enabled/claude-code-chat
   sudo nginx -t && sudo systemctl reload nginx
   echo "Nginx configured for $DOMAIN"
   echo ""

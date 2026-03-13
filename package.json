@@ -1,5 +1,5 @@
 {
-  "name": "tim-chat",
+  "name": "claude-code-chat",
   "version": "1.0.0",
   "description": "Web chat UI for Claude Code CLI",
   "main": "server.js",

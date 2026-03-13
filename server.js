@@ -212,7 +212,7 @@ app.get("/api/detached", (req, res) => {
 });
 
 // Upload endpoint — save pasted images/files to tmp
-const UPLOAD_DIR = "/tmp/tim-chat-uploads";
+const UPLOAD_DIR = "/tmp/claude-code-chat-uploads";
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 app.post("/api/upload", (req, res) => {
@@ -468,5 +468,5 @@ wss.on("connection", (ws, req) => {
 });
 
 server.listen(PORT, BIND_HOST, () => {
-  console.log(`Tim Chat server running on ${BIND_HOST}:${PORT}`);
+  console.log(`Claude Code Chat server running on ${BIND_HOST}:${PORT}`);
 });
