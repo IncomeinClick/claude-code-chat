@@ -356,6 +356,7 @@ wss.on("connection", (ws, req) => {
       "--input-format", "stream-json",
       "--include-partial-messages",
       "--verbose",
+      "--permission-mode", "auto",
     ];
     if (session.resumeId) args.push("--resume", session.resumeId);
     const proc = spawn(CLAUDE_BIN, args, {
