@@ -550,6 +550,24 @@ body {
 </head>
 <body>
 
+<!-- First-Run Setup -->
+<div class="login-screen" id="setup-screen" style="display:none;">
+  <div class="login-box" style="max-width:420px;">
+    <h1 style="margin-bottom:4px;">Welcome!</h1>
+    <p style="margin-bottom:20px;">Create your login to get started.</p>
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;">Username</label>
+    <input type="text" id="setup-user" placeholder="e.g. admin" autocomplete="username">
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;">Password</label>
+    <input type="password" id="setup-pass" placeholder="At least 6 characters" autocomplete="new-password">
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;">Confirm Password</label>
+    <input type="password" id="setup-pass2" placeholder="Type password again" autocomplete="new-password">
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;">Display Name <span style="color:var(--text-muted);">(optional)</span></label>
+    <input type="text" id="setup-name" placeholder="Claude Code" autocomplete="off">
+    <button onclick="doSetup()" id="setup-btn" style="margin-top:8px;">Create Account</button>
+    <div class="login-error" id="setup-error"></div>
+  </div>
+</div>
+
 <!-- Login -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
@@ -653,7 +671,7 @@ let reconnectTimer = null;
 let intentionalClose = false;
 let serverSessionId = null; // the session ID on the server side
 
-// Fetch display name from server
+// Fetch display name and setup mode from server
 fetch("/api/config").then(r => r.json()).then(c => {
   displayName = c.displayName || "Claude Code";
   document.title = displayName + " Chat";
@@ -661,7 +679,54 @@ fetch("/api/config").then(r => r.json()).then(c => {
   document.getElementById("header-name").textContent = displayName;
   document.getElementById("thinking-text").textContent = displayName + " is thinking...";
   document.getElementById("picker-title").textContent = displayName;
+  // If setup mode, show setup screen instead of login
+  if (c.setupMode) {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("setup-screen").style.display = "flex";
+    document.getElementById("setup-user").focus();
+  }
 }).catch(() => {});
+
+async function doSetup() {
+  const user = document.getElementById("setup-user").value.trim();
+  const pass = document.getElementById("setup-pass").value;
+  const pass2 = document.getElementById("setup-pass2").value;
+  const name = document.getElementById("setup-name").value.trim();
+  const errEl = document.getElementById("setup-error");
+  const btn = document.getElementById("setup-btn");
+  errEl.style.display = "none";
+
+  if (!user) { errEl.textContent = "Username is required"; errEl.style.display = "block"; return; }
+  if (user.length < 2) { errEl.textContent = "Username must be at least 2 characters"; errEl.style.display = "block"; return; }
+  if (!pass) { errEl.textContent = "Password is required"; errEl.style.display = "block"; return; }
+  if (pass.length < 6) { errEl.textContent = "Password must be at least 6 characters"; errEl.style.display = "block"; return; }
+  if (pass !== pass2) { errEl.textContent = "Passwords don't match"; errEl.style.display = "block"; return; }
+
+  btn.disabled = true;
+  btn.textContent = "Setting up...";
+  try {
+    const res = await fetch("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user, password: pass, displayName: name || undefined }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    // Auto-login with returned token
+    token = data.token;
+    displayName = name || "Claude Code";
+    localStorage.setItem("tim_token", token);
+    document.title = displayName + " Chat";
+    document.getElementById("header-name").textContent = displayName;
+    document.getElementById("thinking-text").textContent = displayName + " is thinking...";
+    showChat();
+  } catch (e) {
+    errEl.textContent = e.message || "Setup failed";
+    errEl.style.display = "block";
+    btn.disabled = false;
+    btn.textContent = "Create Account";
+  }
+}
 
 function renderMarkdown(text) {
   return text
@@ -1105,6 +1170,7 @@ function endSession() {
 
 function showSessionPicker() {
   document.getElementById("login-screen").style.display = "none";
+  document.getElementById("setup-screen").style.display = "none";
   document.getElementById("session-picker").style.display = "flex";
   document.getElementById("chat-screen").style.display = "none";
   document.getElementById("picker-buttons").style.display = "block";
@@ -1197,6 +1263,12 @@ if (token) showChat();
 
 document.getElementById("login-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 document.getElementById("login-user").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("login-pass").focus(); });
+
+// Setup form keyboard navigation
+document.getElementById("setup-user").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("setup-pass").focus(); });
+document.getElementById("setup-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("setup-pass2").focus(); });
+document.getElementById("setup-pass2").addEventListener("keydown", (e) => { if (e.key === "Enter") document.getElementById("setup-name").focus(); });
+document.getElementById("setup-name").addEventListener("keydown", (e) => { if (e.key === "Enter") doSetup(); });
 
 // Re-authentication
 let reauthPolling = null;

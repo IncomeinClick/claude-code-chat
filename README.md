@@ -35,9 +35,45 @@ bash setup/install.sh
 
 The install script will:
 1. Install npm dependencies
-2. Prompt for login credentials
+2. Prompt for login credentials (or use `--web-setup` to skip — set credentials in the browser instead)
 3. Generate `.env` with hashed password and JWT secret
-4. Optionally install systemd service and nginx config
+4. Optionally install systemd service (Linux) and nginx config
+
+### Easiest: Web-Based Setup
+
+Skip the terminal credential prompts entirely — set your username and password in the browser on first visit:
+
+```bash
+bash setup/install.sh --web-setup
+npm start
+# Open http://localhost:3456 → setup wizard appears
+```
+
+### Non-Interactive Install
+
+Pass all options as flags (great for scripts and automation):
+
+```bash
+bash setup/install.sh \
+  --user admin \
+  --password mysecret \
+  --name "My Claude" \
+  --service \
+  --nginx --domain chat.example.com
+```
+
+### Install Script Options
+
+| Flag | Description |
+|------|-------------|
+| `--user USERNAME` | Login username |
+| `--password PASSWORD` | Login password |
+| `--name NAME` | Display name in UI (default: Claude Code) |
+| `--port PORT` | Server port (default: 3456) |
+| `--domain DOMAIN` | Domain for nginx config |
+| `--service` | Install systemd service (Linux only) |
+| `--nginx` | Install nginx config (requires `--domain`) |
+| `--web-setup` | Skip credentials — configure via browser on first visit |
 
 ## Manual Setup
 
