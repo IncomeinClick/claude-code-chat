@@ -1104,7 +1104,7 @@ function setWaiting(on) {
   const wasBusy = waiting;
   waiting = on;
   document.getElementById("thinking").className = on ? "thinking active" : "thinking";
-  document.getElementById("send-btn").style.display = on ? "none" : "flex";
+  document.getElementById("send-btn").style.display = "flex";
   document.getElementById("stop-btn").style.display = on ? "flex" : "none";
   if (wasBusy && !on) notifyDone();
 }
