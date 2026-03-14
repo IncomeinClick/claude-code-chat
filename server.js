@@ -26,6 +26,19 @@ const BIND_HOST = env.BIND_HOST || "127.0.0.1";
 const INACTIVITY_TIMEOUT = (parseInt(env.INACTIVITY_TIMEOUT) || 1800) * 1000;
 let DISPLAY_NAME = env.DISPLAY_NAME || "Claude Code";
 
+// Ensure Claude Code permissions exist (~/.claude/settings.json)
+const claudeDir = path.join(process.env.HOME || "/root", ".claude");
+const claudeSettings = path.join(claudeDir, "settings.json");
+if (!fs.existsSync(claudeSettings)) {
+  fs.mkdirSync(claudeDir, { recursive: true });
+  fs.writeFileSync(claudeSettings, JSON.stringify({
+    permissions: {
+      allow: ["Bash(*)", "Read(*)", "Write(*)", "Edit(*)", "Glob(*)", "Grep(*)", "Agent(*)"]
+    }
+  }, null, 2) + "\n");
+  console.log("[startup] Created Claude Code permissions:", claudeSettings);
+}
+
 // Setup mode: no credentials configured yet
 function isSetupMode() {
   return !USERNAME || !PASSWORD_HASH;
