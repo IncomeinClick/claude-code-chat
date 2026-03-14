@@ -568,6 +568,52 @@ body {
   </div>
 </div>
 
+<!-- Identity Setup (Step 2) -->
+<div class="login-screen" id="identity-screen" style="display:none;">
+  <div class="login-box" style="max-width:520px;">
+    <h1 style="margin-bottom:4px;">Personalize Claude</h1>
+    <p style="margin-bottom:16px;">Choose a personality for your AI assistant. You can edit these files later.</p>
+
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:6px;">Personality</label>
+    <div id="soul-presets" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <button type="button" class="preset-btn active" data-preset="professional" style="flex:1;min-width:120px;padding:10px 8px;background:var(--bg-tertiary);border:2px solid var(--accent);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;text-align:left;">
+        <strong style="display:block;margin-bottom:2px;">Professional</strong>
+        <span style="color:var(--text-muted);font-size:11px;">Direct, precise, efficient</span>
+      </button>
+      <button type="button" class="preset-btn" data-preset="friendly" style="flex:1;min-width:120px;padding:10px 8px;background:var(--bg-tertiary);border:2px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;text-align:left;">
+        <strong style="display:block;margin-bottom:2px;">Friendly</strong>
+        <span style="color:var(--text-muted);font-size:11px;">Warm, encouraging, patient</span>
+      </button>
+      <button type="button" class="preset-btn" data-preset="mentor" style="flex:1;min-width:120px;padding:10px 8px;background:var(--bg-tertiary);border:2px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;text-align:left;">
+        <strong style="display:block;margin-bottom:2px;">Mentor</strong>
+        <span style="color:var(--text-muted);font-size:11px;">Teaching, explains why</span>
+      </button>
+      <button type="button" class="preset-btn" data-preset="casual" style="flex:1;min-width:120px;padding:10px 8px;background:var(--bg-tertiary);border:2px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;text-align:left;">
+        <strong style="display:block;margin-bottom:2px;">Casual</strong>
+        <span style="color:var(--text-muted);font-size:11px;">Relaxed, conversational</span>
+      </button>
+      <button type="button" class="preset-btn" data-preset="custom" style="flex:1;min-width:120px;padding:10px 8px;background:var(--bg-tertiary);border:2px solid var(--border);border-radius:8px;color:var(--text-primary);cursor:pointer;font-size:13px;text-align:left;">
+        <strong style="display:block;margin-bottom:2px;">Custom</strong>
+        <span style="color:var(--text-muted);font-size:11px;">Write your own</span>
+      </button>
+    </div>
+
+    <div id="soul-custom-wrap" style="display:none;">
+      <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;">Custom personality description</label>
+      <textarea id="soul-custom" rows="4" style="width:100%;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;resize:vertical;font-family:inherit;" placeholder="Describe how you want Claude to behave..."></textarea>
+    </div>
+
+    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;margin-top:12px;">Assistant Name <span style="color:var(--text-muted);">(for soul.md)</span></label>
+    <input type="text" id="soul-name" placeholder="e.g. Claude, Tim, Atlas" autocomplete="off" style="margin-bottom:16px;">
+
+    <div style="display:flex;gap:8px;">
+      <button onclick="skipIdentity()" style="flex:1;padding:12px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;font-size:15px;cursor:pointer;">Skip</button>
+      <button onclick="saveIdentity()" id="identity-btn" style="flex:2;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;">Save & Start</button>
+    </div>
+    <div class="login-error" id="identity-error"></div>
+  </div>
+</div>
+
 <!-- Login -->
 <div class="login-screen" id="login-screen">
   <div class="login-box">
@@ -719,12 +765,162 @@ async function doSetup() {
     document.title = displayName + " Chat";
     document.getElementById("header-name").textContent = displayName;
     document.getElementById("thinking-text").textContent = displayName + " is thinking...";
-    showChat();
+    // Go to identity setup (step 2) instead of chat
+    document.getElementById("setup-screen").style.display = "none";
+    document.getElementById("identity-screen").style.display = "flex";
+    document.getElementById("soul-name").value = displayName !== "Claude Code" ? displayName : "";
+    document.getElementById("soul-name").focus();
   } catch (e) {
     errEl.textContent = e.message || "Setup failed";
     errEl.style.display = "block";
     btn.disabled = false;
     btn.textContent = "Create Account";
+  }
+}
+
+// Soul preset definitions
+const soulPresets = {
+  professional: `You are {NAME}, a highly capable AI assistant.
+
+## Personality
+- Direct and precise — lead with the answer, skip filler
+- Efficient — favor concise solutions over lengthy explanations
+- Confident — give clear recommendations when asked
+- Professional tone — respectful but not overly formal
+
+## Behavior
+- When given a task, do it. Don't ask unnecessary clarifying questions
+- High-confidence answers only — verify in code, never guess
+- Summarize what was done after each task
+- Communicate in the user's language`,
+
+  friendly: `You are {NAME}, a warm and helpful AI assistant.
+
+## Personality
+- Friendly and encouraging — celebrate wins, be positive about progress
+- Patient — explain things clearly without judgment
+- Approachable — use a conversational tone
+- Supportive — offer suggestions gently
+
+## Behavior
+- Check in with the user when uncertain about direction
+- Explain what you're doing and why in simple terms
+- Offer alternatives when a direct approach won't work
+- Communicate in the user's language`,
+
+  mentor: `You are {NAME}, an AI mentor and technical guide.
+
+## Personality
+- Teaching-oriented — explain the "why" behind decisions
+- Thorough — provide context and background when relevant
+- Encouraging — build understanding, don't just give answers
+- Knowledgeable — share best practices and patterns
+
+## Behavior
+- When fixing bugs, explain the root cause
+- When writing code, briefly explain design choices
+- Suggest improvements the user can learn from
+- Communicate in the user's language`,
+
+  casual: `You are {NAME}, a chill AI assistant.
+
+## Personality
+- Relaxed and conversational — talk like a colleague, not a service
+- Brief — keep it short, skip formalities
+- Practical — focus on getting things done
+- Honest — say when something is a bad idea
+
+## Behavior
+- Don't over-explain — the user knows what they're doing
+- Keep responses short unless detail is needed
+- Be direct about tradeoffs and limitations
+- Communicate in the user's language`,
+};
+
+let selectedPreset = "professional";
+
+// Preset button click handlers
+document.getElementById("soul-presets").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-preset]");
+  if (!btn) return;
+  selectedPreset = btn.dataset.preset;
+  document.querySelectorAll("#soul-presets .preset-btn").forEach(b => {
+    b.style.borderColor = b === btn ? "var(--accent)" : "var(--border)";
+    b.classList.toggle("active", b === btn);
+  });
+  document.getElementById("soul-custom-wrap").style.display = selectedPreset === "custom" ? "block" : "none";
+});
+
+function generateClaudeMd(name) {
+  return `# CLAUDE.md
+
+## About
+This server runs Claude Code Chat, a web interface for Claude Code CLI.
+
+## Identity
+- Assistant name: ${name}
+- Identity file: soul.md (personality and behavior rules)
+- Memory file: memory.md (session history)
+
+## Rules
+- Read soul.md at the start of every session for personality guidance
+- Update memory.md at the end of every session with what was done
+- Communicate in the user's language
+- High confidence answers only — verify before responding
+- Keep responses concise — the user may be on mobile
+`;
+}
+
+function generateSoulMd(name, preset, customText) {
+  if (preset === "custom") {
+    return `# Soul — ${name}\n\n${customText || "You are " + name + ", an AI assistant."}\n`;
+  }
+  const template = soulPresets[preset] || soulPresets.professional;
+  return `# Soul — ${name}\n\n${template.replace(/\{NAME\}/g, name)}\n`;
+}
+
+function generateMemoryMd() {
+  return `# Memory
+
+## Session Log
+_No sessions yet. This file will be updated at the end of each session._
+`;
+}
+
+function skipIdentity() {
+  document.getElementById("identity-screen").style.display = "none";
+  showChat();
+}
+
+async function saveIdentity() {
+  const name = document.getElementById("soul-name").value.trim() || displayName || "Claude";
+  const customText = document.getElementById("soul-custom").value.trim();
+  const errEl = document.getElementById("identity-error");
+  const btn = document.getElementById("identity-btn");
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  errEl.style.display = "none";
+
+  try {
+    const res = await fetch("/api/setup/identity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({
+        claudeMd: generateClaudeMd(name),
+        soulMd: generateSoulMd(name, selectedPreset, customText),
+        memoryMd: generateMemoryMd(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    document.getElementById("identity-screen").style.display = "none";
+    showChat();
+  } catch (e) {
+    errEl.textContent = e.message || "Failed to save identity files";
+    errEl.style.display = "block";
+    btn.disabled = false;
+    btn.textContent = "Save & Start";
   }
 }
 
@@ -1171,6 +1367,7 @@ function endSession() {
 function showSessionPicker() {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("identity-screen").style.display = "none";
   document.getElementById("session-picker").style.display = "flex";
   document.getElementById("chat-screen").style.display = "none";
   document.getElementById("picker-buttons").style.display = "block";

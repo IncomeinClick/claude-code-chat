@@ -120,6 +120,32 @@ app.post("/api/setup", async (req, res) => {
   }
 });
 
+// Save identity files (CLAUDE.md, soul.md, memory.md) to CLAUDE_CWD
+app.post("/api/setup/identity", (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !verifyToken(authHeader.replace("Bearer ", ""))) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { claudeMd, soulMd, memoryMd } = req.body;
+
+  try {
+    if (claudeMd) {
+      fs.writeFileSync(path.join(CLAUDE_CWD, "CLAUDE.md"), claudeMd);
+    }
+    if (soulMd) {
+      fs.writeFileSync(path.join(CLAUDE_CWD, "soul.md"), soulMd);
+    }
+    if (memoryMd) {
+      fs.writeFileSync(path.join(CLAUDE_CWD, "memory.md"), memoryMd);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[setup/identity] Error:", e);
+    res.status(500).json({ error: "Failed to save identity files." });
+  }
+});
+
 // List past Claude sessions for resume picker
 app.get("/api/sessions", (req, res) => {
   const authHeader = req.headers.authorization;
