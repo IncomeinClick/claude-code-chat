@@ -1,41 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Read",
-      "Write",
-      "Edit",
-      "Glob",
-      "Grep",
-      "Agent",
-      "Bash(cat *)",
-      "Bash(ls *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(wc *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(rg *)",
-      "Bash(git status*)",
-      "Bash(git log*)",
-      "Bash(git diff*)",
-      "Bash(git show*)",
-      "Bash(git branch*)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(systemctl status *)",
-      "Bash(systemctl is-active *)",
-      "Bash(systemctl restart *)",
-      "Bash(journalctl *)",
-      "Bash(docker logs *)",
-      "Bash(docker ps *)",
-      "Bash(python3 *)",
-      "Bash(curl *)",
-      "Bash(pip install *)",
-      "Bash(npm *)",
-      "Bash(node *)",
-      "Bash(mkdir *)",
-      "Bash(cp *)"
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Agent(*)"
     ]
   }
 }

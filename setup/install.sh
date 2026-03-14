@@ -270,6 +270,31 @@ if [[ "$INSTALL_NGX" =~ ^[Yy] ]]; then
   fi
 fi
 
+# ── Claude Code Permissions ──
+info "Setting up Claude Code permissions..."
+CLAUDE_DIR="$HOME_DIR/.claude"
+mkdir -p "$CLAUDE_DIR"
+if [ ! -f "$CLAUDE_DIR/settings.json" ]; then
+  cat > "$CLAUDE_DIR/settings.json" << 'SETTINGSEOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Agent(*)"
+    ]
+  }
+}
+SETTINGSEOF
+  ok "Claude Code permissions configured (all tools auto-approved)"
+else
+  ok "Claude Code permissions already exist — skipping"
+fi
+
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║         Setup Complete!              ║"
