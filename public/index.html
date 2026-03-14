@@ -603,10 +603,7 @@ body {
       <textarea id="soul-custom" rows="4" style="width:100%;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;resize:vertical;font-family:inherit;" placeholder="Describe how you want Claude to behave..."></textarea>
     </div>
 
-    <label style="display:block;color:var(--text-secondary);font-size:13px;margin-bottom:4px;margin-top:12px;">Assistant Name <span style="color:var(--text-muted);">(for soul.md)</span></label>
-    <input type="text" id="soul-name" placeholder="e.g. Claude, Tim, Atlas" autocomplete="off" style="margin-bottom:16px;">
-
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;margin-top:12px;">
       <button onclick="skipIdentity()" style="flex:1;padding:12px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);border-radius:8px;font-size:15px;cursor:pointer;">Skip</button>
       <button onclick="saveIdentity()" id="identity-btn" style="flex:2;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:600;">Save & Start</button>
     </div>
@@ -768,8 +765,6 @@ async function doSetup() {
     // Go to identity setup (step 2) instead of chat
     document.getElementById("setup-screen").style.display = "none";
     document.getElementById("identity-screen").style.display = "flex";
-    document.getElementById("soul-name").value = displayName !== "Claude Code" ? displayName : "";
-    document.getElementById("soul-name").focus();
   } catch (e) {
     errEl.textContent = e.message || "Setup failed";
     errEl.style.display = "block";
@@ -893,7 +888,7 @@ function skipIdentity() {
 }
 
 async function saveIdentity() {
-  const name = document.getElementById("soul-name").value.trim() || displayName || "Claude";
+  const name = displayName || "Claude";
   const customText = document.getElementById("soul-custom").value.trim();
   const errEl = document.getElementById("identity-error");
   const btn = document.getElementById("identity-btn");
