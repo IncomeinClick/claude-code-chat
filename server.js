@@ -396,6 +396,10 @@ wss.on("connection", (ws, req) => {
       session.claude = null;
       if (session.stopping) {
         session.stopping = false;
+        // Preserve session so next message resumes the same conversation
+        if (session.claudeSessionId) {
+          session.resumeId = session.claudeSessionId;
+        }
         sessionSend({ type: "stopped" });
       } else {
         sessionSend({ type: "exit", code });
