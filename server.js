@@ -39,23 +39,6 @@ if (!fs.existsSync(claudeSettings)) {
   console.log("[startup] Created Claude Code permissions:", claudeSettings);
 }
 
-// Setup mode: no credentials configured yet
-function isSetupMode() {
-  return !USERNAME || !PASSWORD_HASH;
-}
-
-function reloadEnv() {
-  const raw = fs.readFileSync(path.join(__dirname, ".env"), "utf8");
-  const parsed = {};
-  for (const line of raw.split("\n")) {
-    const i = line.indexOf("=");
-    if (i > 0) parsed[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-  }
-  JWT_SECRET = parsed.JWT_SECRET;
-  USERNAME = parsed.USERNAME;
-  PASSWORD_HASH = parsed.PASSWORD_HASH;
-  DISPLAY_NAME = parsed.DISPLAY_NAME || "Claude Code";
-}
 
 const app = express();
 app.use(express.json({ limit: "20mb" }));
@@ -70,93 +53,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/api/config", (req, res) => {
-  res.json({ displayName: DISPLAY_NAME, setupMode: isSetupMode() });
-});
-
-// Web-based first-run setup
-app.post("/api/setup", async (req, res) => {
-  if (!isSetupMode()) {
-    return res.status(403).json({ error: "Already configured. Delete USERNAME and PASSWORD_HASH from .env to reconfigure." });
-  }
-
-  const { username, password, displayName } = req.body;
-  if (!username || !password) {
-    return res.status(400).json({ error: "Username and password are required." });
-  }
-  if (username.length < 2) {
-    return res.status(400).json({ error: "Username must be at least 2 characters." });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: "Password must be at least 6 characters." });
-  }
-
-  try {
-    const hash = await bcrypt.hash(password, 10);
-    const name = displayName || "Claude Code";
-
-    // Read current .env and update/add fields
-    let envContent = fs.readFileSync(path.join(__dirname, ".env"), "utf8");
-
-    // Remove SETUP_MODE if present
-    envContent = envContent.replace(/^SETUP_MODE=.*\n?/m, "");
-
-    // Add or replace credentials
-    if (/^USERNAME=/m.test(envContent)) {
-      envContent = envContent.replace(/^USERNAME=.*/m, `USERNAME=${username}`);
-    } else {
-      envContent = `USERNAME=${username}\n${envContent}`;
-    }
-
-    if (/^PASSWORD_HASH=/m.test(envContent)) {
-      envContent = envContent.replace(/^PASSWORD_HASH=.*/m, `PASSWORD_HASH=${hash}`);
-    } else {
-      // Insert after USERNAME line
-      envContent = envContent.replace(/^(USERNAME=.*)/m, `$1\nPASSWORD_HASH=${hash}`);
-    }
-
-    if (/^DISPLAY_NAME=/m.test(envContent)) {
-      envContent = envContent.replace(/^DISPLAY_NAME=.*/m, `DISPLAY_NAME=${name}`);
-    }
-
-    // Ensure no trailing blank lines
-    envContent = envContent.replace(/\n{3,}/g, "\n\n").trim() + "\n";
-
-    fs.writeFileSync(path.join(__dirname, ".env"), envContent);
-    reloadEnv();
-
-    // Auto-login: return a JWT token
-    const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: "24h" });
-    res.json({ ok: true, token });
-  } catch (e) {
-    console.error("[setup] Error:", e);
-    res.status(500).json({ error: "Failed to save credentials." });
-  }
-});
-
-// Save identity files (CLAUDE.md, soul.md, memory.md) to CLAUDE_CWD
-app.post("/api/setup/identity", (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !verifyToken(authHeader.replace("Bearer ", ""))) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const { claudeMd, soulMd, memoryMd } = req.body;
-
-  try {
-    if (claudeMd) {
-      fs.writeFileSync(path.join(CLAUDE_CWD, "CLAUDE.md"), claudeMd);
-    }
-    if (soulMd) {
-      fs.writeFileSync(path.join(CLAUDE_CWD, "soul.md"), soulMd);
-    }
-    if (memoryMd) {
-      fs.writeFileSync(path.join(CLAUDE_CWD, "memory.md"), memoryMd);
-    }
-    res.json({ ok: true });
-  } catch (e) {
-    console.error("[setup/identity] Error:", e);
-    res.status(500).json({ error: "Failed to save identity files." });
-  }
+  res.json({ displayName: DISPLAY_NAME });
 });
 
 // List past Claude sessions for resume picker

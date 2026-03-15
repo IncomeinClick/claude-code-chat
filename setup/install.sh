@@ -36,7 +36,6 @@ ARG_PORT=""
 ARG_DOMAIN=""
 ARG_SERVICE=""
 ARG_NGINX=""
-ARG_WEB_SETUP=""
 
 usage() {
   echo "Usage: bash setup/install.sh [OPTIONS]"
@@ -49,7 +48,6 @@ usage() {
   echo "  --domain DOMAIN       Domain for nginx config"
   echo "  --service             Install systemd service (Linux only)"
   echo "  --nginx               Install nginx config (requires --domain)"
-  echo "  --web-setup           Skip credential setup — configure via browser on first visit"
   echo "  -h, --help            Show this help"
   echo ""
   echo "Examples:"
@@ -58,9 +56,6 @@ usage() {
   echo ""
   echo "  # Non-interactive with all options:"
   echo "  bash setup/install.sh --user admin --password secret123 --service --nginx --domain chat.example.com"
-  echo ""
-  echo "  # Skip credentials — set them up in the browser:"
-  echo "  bash setup/install.sh --web-setup"
   exit 0
 }
 
@@ -73,7 +68,6 @@ while [[ $# -gt 0 ]]; do
     --domain)     ARG_DOMAIN="$2"; shift 2 ;;
     --service)    ARG_SERVICE="yes"; shift ;;
     --nginx)      ARG_NGINX="yes"; shift ;;
-    --web-setup)  ARG_WEB_SETUP="yes"; shift ;;
     -h|--help)    usage ;;
     *)            warn "Unknown option: $1"; shift ;;
   esac
@@ -119,26 +113,6 @@ echo ""
 # ── Credential Setup ──
 if [ -f "$INSTALL_DIR/.env" ]; then
   ok ".env already exists — skipping credential setup"
-elif [ "$ARG_WEB_SETUP" = "yes" ]; then
-  # Web setup mode: create minimal .env without credentials
-  TC_PORT="${ARG_PORT:-3456}"
-  JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-
-  cat > "$INSTALL_DIR/.env" << ENVEOF
-JWT_SECRET=$JWT_SECRET
-PORT=$TC_PORT
-BIND_HOST=127.0.0.1
-CLAUDE_BIN=claude
-CLAUDE_CWD=$HOME_DIR
-DISPLAY_NAME=Claude Code
-INACTIVITY_TIMEOUT=1800
-SETUP_MODE=true
-ENVEOF
-
-  ok ".env created in web-setup mode"
-  echo ""
-  printf "  ${CYAN}→ Open the app in your browser to set username & password${NC}\n"
-  echo ""
 else
   echo "── Credential Setup ──"
   echo ""
@@ -197,6 +171,157 @@ INACTIVITY_TIMEOUT=1800
 ENVEOF
 
   ok ".env created"
+fi
+
+echo ""
+
+# ── Identity Setup (soul.md, CLAUDE.md, memory.md) ──
+# Resolve CLAUDE_CWD from .env or use HOME
+if [ -f "$INSTALL_DIR/.env" ]; then
+  CLAUDE_CWD=$(grep '^CLAUDE_CWD=' "$INSTALL_DIR/.env" | cut -d= -f2)
+fi
+CLAUDE_CWD="${CLAUDE_CWD:-$HOME_DIR}"
+
+if [ -f "$CLAUDE_CWD/soul.md" ]; then
+  ok "Identity files already exist — skipping"
+else
+  echo "── Identity Setup ──"
+  echo ""
+  echo "  Choose a personality for your AI assistant:"
+  echo ""
+  echo "  1) Professional — Direct, precise, efficient"
+  echo "  2) Friendly — Warm, encouraging, patient"
+  echo "  3) Mentor — Teaching-oriented, explains why"
+  echo "  4) Casual — Relaxed, conversational"
+  echo "  5) Skip — I'll set it up later"
+  echo ""
+  printf "  Choice [1]: "
+  read PERSONALITY_CHOICE
+  PERSONALITY_CHOICE="${PERSONALITY_CHOICE:-1}"
+
+  # Resolve display name
+  SOUL_NAME="${TC_NAME:-Claude Code}"
+  if [ -z "$TC_NAME" ] && [ -f "$INSTALL_DIR/.env" ]; then
+    SOUL_NAME=$(grep '^DISPLAY_NAME=' "$INSTALL_DIR/.env" | cut -d= -f2)
+    SOUL_NAME="${SOUL_NAME:-Claude Code}"
+  fi
+
+  case "$PERSONALITY_CHOICE" in
+    1)
+      cat > "$CLAUDE_CWD/soul.md" << SOULEOF
+# Soul — $SOUL_NAME
+
+You are $SOUL_NAME, a highly capable AI assistant.
+
+## Personality
+- Direct and precise — lead with the answer, skip filler
+- Efficient — favor concise solutions over lengthy explanations
+- Confident — give clear recommendations when asked
+- Professional tone — respectful but not overly formal
+
+## Behavior
+- When given a task, do it. Don't ask unnecessary clarifying questions
+- High-confidence answers only — verify in code, never guess
+- Summarize what was done after each task
+- Communicate in the user's language
+SOULEOF
+      ;;
+    2)
+      cat > "$CLAUDE_CWD/soul.md" << SOULEOF
+# Soul — $SOUL_NAME
+
+You are $SOUL_NAME, a warm and helpful AI assistant.
+
+## Personality
+- Friendly and encouraging — celebrate wins, be positive about progress
+- Patient — explain things clearly without judgment
+- Approachable — use a conversational tone
+- Supportive — offer suggestions gently
+
+## Behavior
+- Check in with the user when uncertain about direction
+- Explain what you're doing and why in simple terms
+- Offer alternatives when a direct approach won't work
+- Communicate in the user's language
+SOULEOF
+      ;;
+    3)
+      cat > "$CLAUDE_CWD/soul.md" << SOULEOF
+# Soul — $SOUL_NAME
+
+You are $SOUL_NAME, an AI mentor and technical guide.
+
+## Personality
+- Teaching-oriented — explain the "why" behind decisions
+- Thorough — provide context and background when relevant
+- Encouraging — build understanding, don't just give answers
+- Knowledgeable — share best practices and patterns
+
+## Behavior
+- When fixing bugs, explain the root cause
+- When writing code, briefly explain design choices
+- Suggest improvements the user can learn from
+- Communicate in the user's language
+SOULEOF
+      ;;
+    4)
+      cat > "$CLAUDE_CWD/soul.md" << SOULEOF
+# Soul — $SOUL_NAME
+
+You are $SOUL_NAME, a chill AI assistant.
+
+## Personality
+- Relaxed and conversational — talk like a colleague, not a service
+- Brief — keep it short, skip formalities
+- Practical — focus on getting things done
+- Honest — say when something is a bad idea
+
+## Behavior
+- Don't over-explain — the user knows what they're doing
+- Keep responses short unless detail is needed
+- Be direct about tradeoffs and limitations
+- Communicate in the user's language
+SOULEOF
+      ;;
+    5)
+      info "Skipping identity setup"
+      ;;
+    *)
+      warn "Invalid choice — skipping identity setup"
+      ;;
+  esac
+
+  if [[ "$PERSONALITY_CHOICE" =~ ^[1-4]$ ]]; then
+    # Create CLAUDE.md
+    cat > "$CLAUDE_CWD/CLAUDE.md" << CLAUDEEOF
+# CLAUDE.md
+
+## About
+This server runs Claude Code Chat, a web interface for Claude Code CLI.
+
+## Identity
+- Assistant name: $SOUL_NAME
+- Identity file: soul.md (personality and behavior rules)
+- Memory file: memory.md (session history)
+
+## Rules
+- Read soul.md at the start of every session for personality guidance
+- Update memory.md at the end of every session with what was done
+- Communicate in the user's language
+- High confidence answers only — verify before responding
+- Keep responses concise — the user may be on mobile
+CLAUDEEOF
+
+    # Create memory.md
+    cat > "$CLAUDE_CWD/memory.md" << MEMEOF
+# Memory
+
+## Session Log
+_No sessions yet. This file will be updated at the end of each session._
+MEMEOF
+
+    ok "Identity files created (soul.md, CLAUDE.md, memory.md)"
+  fi
 fi
 
 echo ""
@@ -302,10 +427,5 @@ echo "╚═══════════════════════�
 echo ""
 info "Start manually: cd $INSTALL_DIR && npm start"
 info "Default port: ${ARG_PORT:-3456}"
-
-if [ "$ARG_WEB_SETUP" = "yes" ]; then
-  echo ""
-  printf "  ${YELLOW}→ First visit: open the app to create your login credentials${NC}\n"
-fi
 
 echo ""
